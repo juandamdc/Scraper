@@ -1,4 +1,4 @@
-from Chord.Interval import Interval
+from Interval import Interval
 
 
 class FingerTable:
@@ -19,12 +19,7 @@ class TableEntry:
     def __init__(self, idx, start, end, ip=0, port=0):
         self.start = start
         self.interval = Interval(start, end)
-        self.node =Node(idx, ip, port)
+        self.node =(idx, ip, port)
         if idx is None:
             self.node=None
 
-class Node:
-    def __init__(self, idx, ip, port):
-        self.idx = idx
-        self.ip = ip
-        self.port = port
