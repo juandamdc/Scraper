@@ -76,23 +76,23 @@ class ChordNode(rpyc.Service):
             self.predecessor = self.node()
 
         threading.Thread(target=self.stabilize).start()
-        threading.Thread(target=self.fix_fingers).start()
+        threading.Thread(target=self.fix_fingers).start() 
 
     @repeater(2)
     def stabilize(self):
-        print("start-stabilize")
         x = self.remote_node(self.exposed_successor())
         try:
             x = self.remote_node(x.predecessor())
+            if Interval(self.idx + 1, self.exposed_successor()[0] - 1).contains(x.idx()):
+                self.fingerTable[0].node = (x.idx(), x.ip(), x.port())
         except Exception as e:
-            return
+            pass
 
-        if Interval(self.idx + 1, self.exposed_successor()[0] - 1).contains(x.idx()):
-            self.fingerTable[0].node = (x.idx(), x.ip(), x.port())
+        
         self.remote_node(self.exposed_successor()).notify((self.idx, self.ip, self.port))
-        print("end-stabilize")
 
     def exposed_notify(self, node):
+
         try:
             self.remote_node(self.predecessor)
         except Exception as e:
