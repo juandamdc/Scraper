@@ -2,8 +2,10 @@ from ChordNode import ChordNode
 from  rpyc.utils.helpers import classpartial
 from  rpyc.utils.server import ThreadedServer
 import threading
+import sys
 
-ch= ChordNode('localhost',8000)
+ch= ChordNode()
+ch.start('192.168.43.83' ,8000)
 t= ThreadedServer(ch,port=8000)
 t=threading.Thread(target=t.start)
 t.start()

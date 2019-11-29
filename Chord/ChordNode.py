@@ -1,20 +1,23 @@
 import hashlib
 import threading
-
+import random
 import rpyc
 from FingerTable import FingerTable
 from Interval import Interval
 from Repeater import repeater
+from threading import Lock
 
 
 class ChordNode(rpyc.Service):
-    def __init__(self, ip, port):
+
+    def start(self, ip, port):
         self.ip = ip
         self.port = port
         self.idx = int(hashlib.sha256(ip.encode() + str(port).encode()).hexdigest(), 16)
         self.fingerTable = FingerTable(self.idx, ip, port, 256)
         self.predecessor = None
         self.iter = 1
+        self.mut=Lock()
 
     def exposed_idx(self):
         return self.idx
@@ -28,15 +31,24 @@ class ChordNode(rpyc.Service):
     def node(self):
         return self.idx, self.ip, self.port
 
-    def remote_node(self, node):
-        return rpyc.connect(node[1], node[2]).root
+    def remote_node(self, node,time=60):
+        return rpyc.connect(node[1], node[2],config={'sync_request_timeout':time}).root
+
+    def ping(self,node):
+        try:
+            rpyc.connect(node[1], node[2]).ping
+            return self.remote_node(node) 
+        except Exception as e:
+            raise e
+        return  
 
     def exposed_successor(self):
         try:
-            self.remote_node((self.fingerTable[0].node[0], self.fingerTable[0].node[1], self.fingerTable[0].node[2]))
+            self.ping((self.fingerTable[0].node[0], self.fingerTable[0].node[1], self.fingerTable[0].node[2]))
         except Exception as e:
+            self.mut.acquire()
             self.next_successor()
-            return self.exposed_successor()
+            self.mut.release()
         return self.fingerTable[0].node[0], self.fingerTable[0].node[1], self.fingerTable[0].node[2]
 
     def exposed_predecessor(self):
@@ -48,7 +60,7 @@ class ChordNode(rpyc.Service):
                 continue
             if Interval(self.idx + 1, idx - 1).contains(self.fingerTable[i].node[0]):
                 try:
-                    x = self.remote_node(self.fingerTable[i].node)
+                    self.ping(self.fingerTable[i].node)
                     return self.fingerTable[i].node
                 except Exception as e:
                     self.fingerTable[i].node = None
@@ -82,7 +94,7 @@ class ChordNode(rpyc.Service):
     def stabilize(self):
         x = self.remote_node(self.exposed_successor())
         try:
-            x = self.remote_node(x.predecessor())
+            x = self.ping(x.predecessor())
             if Interval(self.idx + 1, self.exposed_successor()[0] - 1).contains(x.idx()):
                 self.fingerTable[0].node = (x.idx(), x.ip(), x.port())
         except Exception as e:
@@ -94,7 +106,7 @@ class ChordNode(rpyc.Service):
     def exposed_notify(self, node):
 
         try:
-            self.remote_node(self.predecessor)
+            self.ping(self.predecessor)
         except Exception as e:
             self.predecessor = None
 
@@ -103,19 +115,25 @@ class ChordNode(rpyc.Service):
 
     @repeater(10)
     def fix_fingers(self):
+        self.iter=random.randint(0,255)
         self.fingerTable[self.iter].node = self.exposed_find_successor(self.fingerTable[self.iter].start)
-        self.iter += 1
-        if self.iter == 256:
-            self.iter = 1
+       
 
     def next_successor(self):
         for idx in range(256):
+            if self.fingerTable[idx].node is None:
+                    continue
+            print(self.fingerTable[idx].node,idx)
             try:
-                self.remote_node(self.fingerTable[idx].node)
+                self.ping(self.fingerTable[idx].node)
             except Exception as e:
                 self.fingerTable[idx].node = None
                 continue
-
             self.fingerTable[0].node = self.fingerTable[idx].node
             return
         self.fingerTable[0].node = self.node()
+
+
+
+    def exposed_ind(self, idx):
+        return self.fingerTable[idx]
