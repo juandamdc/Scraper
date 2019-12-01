@@ -5,10 +5,10 @@ import threading
 import sys
 
 ch2= ChordNode()
-ch2.start('192.168.43.83' ,int(sys.argv[1]))
+ch2.start('10.42.0.1' ,int(sys.argv[1]))
 t2= ThreadedServer(ch2,port=int(sys.argv[1]))
 t2=threading.Thread(target=t2.start)
 t2.start()
-ch2.join('192.168.43.252',8000)
+ch2.join('10.42.0.1',8000)
 print(ch2.fingerTable[0].node)
 print(ch2.exposed_predecessor())
