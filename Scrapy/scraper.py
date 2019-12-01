@@ -1,66 +1,75 @@
-from scrapy import Request
-from scrapy.crawler import CrawlerProcess
-from scrapy.spiders import Spider, Rule
-from scrapy.linkextractors import LinkExtractor
+from re import match
+import urllib
+from bs4 import BeautifulSoup
 from hashlib import sha256
 import os
 
-from bs4 import BeautifulSoup
-from re import match
-from utils import put_name, extract_tags
-
-class WebSpider(Spider):
-
-    def __init__(self):
-        self.name = "hi"
-        self.urls = ['file:///media/hi/New%20Volume/univ/00.websites!!/W3Schools/W3Schools/index.html']
-        #self.urls = ['http://quotes.toscrape.com/page/1/', 'http://quotes.toscrape.com/page/2/']
-        #self.urls = ['https://www.w3schools.com/']
+class Hi():
+    def __init__(self, url):
+        self.url = url
+        self.retry = []
 
     def start_requests(self):
-        for url in self.urls:
-            yield Request(url=url, callback=self.parse_url, errback=self.errback_httpbin)
+        try:
+            with urllib.request.urlopen(self.url) as response:
+                html = response.read()
 
-    def parse_url(self, response):
-        le_url = LinkExtractor(allow=(r'\.css$', r'\.js$', r'\.jpg$', r'\.png$', r'\.ico$'),
-                           tags=('a', 'area', 'script', 'link', 'img' ),
-                           attrs=('src', 'href'),
-                           deny_extensions= ['html', 'asp', 'mng', 'pct', 'pst', 'psp', 'ai', 'drw', 'dxf', 'eps', 'ps', 'mp3', 'wma', 'ogg', 'wav', 'ra', 'aac', 'mid', 'au', 'aiff', '3gp', 'asf', 'asx', 'avi', 'mov', 'mp4', 'mpg', 'qt', 'rm', 'swf', 'wmv', 'm4a', 'm4v', 'flv', 'xls', 'xlsx', 'ppt', 'pptx', 'pps', 'doc', 'docx', 'odt', 'ods', 'odg', 'odp', 'pdf', 'exe', 'bin', 'rss', 'zip', 'rar']).extract_links(response)
+            base_url = form_url(self.url)
+            print(base_url)
+            links = []
 
-        soup_tag = BeautifulSoup(response.body, 'lxml').find_all(extract_tags)
+            soup_tag = BeautifulSoup(html, 'lxml').find_all(extract_tags)
+            for indx in range(len(soup_tag)):
+                name = ''
 
-        filename = sha256(response.url.encode('utf-8')).hexdigest()
-        page = 'index.html'
+                if soup_tag[indx].has_attr('href'):
+                    name = put_name(soup_tag[indx]['href'])
+                    links.append((os.path.join(base_url, soup_tag[indx]['href']), name))
+                    soup_tag[indx]['href'] = name
 
-        if not os.path.isdir(filename):
-            os.mkdir(filename)
+                if soup_tag[indx].has_attr('src'):
+                    name = put_name(soup_tag[indx]['src'])
+                    links.append((os.path.join(base_url, soup_tag[indx]['src']), name))
+                    soup_tag[indx]['src'] = name
 
-        for indx in range(len(le_url)):
-            name = ''
+            filename = sha256(response.url.encode('utf-8')).hexdigest()
+            page = 'index.html'
 
-            if soup_tag[indx].has_attr('href'):
-                name = put_name(soup_tag[indx]['href'])
-                soup_tag[indx]['href'] = name
+            if not os.path.isdir(filename):
+                os.mkdir(filename)
 
-            if soup_tag[indx].has_attr('src'):
-                name = put_name(soup_tag[indx]['src'])
-                soup_tag[indx]['src'] = name
+            with open(os.path.join(filename, page), 'wb') as f:
+                f.write(html)
 
-            yield response.follow(le_url[indx], callback=self.parse_urlink, errback=self.errback_httpbin, dont_filter=True, cb_kwargs={'home': filename, 'name': name})
+            for (tag_url, name_url) in links:
+                try:
+                    with urllib.request.urlopen(tag_url) as response:
+                        html = response.read()
 
-        with open(os.path.join(filename, page), 'wb') as f:
-            f.write(response.body)
+                    with open(os.path.join(filename, name_url), 'wb') as f:
+                        f.write(html)
+                except Exception as d:
+                    print(d)
 
-    def parse_urlink(self, response, home, name):
-        with open(os.path.join(home, name), 'wb') as f:
-            f.write(response.body)
+        except Exception as e:
+            raise e
 
-    def errback_httpbin(self, failure):
-        self.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+def extract_tags(tag):
+    return (tag.has_attr('href') and (match(r'.*\.css$', tag['href']) or match(r'.*\.js$', tag['href']) or match(r'.*\.jpg$', tag['href']) or match(r'.*\.png$', tag['href']) or match(r'.*\.ico$', tag['href']))) or (tag.has_attr('src') and (match(r'.*\.css$', tag['src']) or match(r'.*\.js$', tag['src']) or match(r'.*\.jpg$', tag['src']) or match(r'.*\.png$', tag['src']) or match(r'.*\.ico$', tag['src'])))
 
-    def closed(self, reason):
-        print(reason)
+def put_name(name):
+    return '.'.join(name.split('/'))
 
-#cr = CrawlerProcess()
-#cr.crawl(WebSpider)
-#cr.start()
+def form_url(url):
+    url = url.split('?')[0]
+    split_url = url.split('/')
+
+    temp = ''
+    if split_url[0]=='file:':
+        for idx in range(len(split_url)- 1):
+            temp = os.path.join(temp, split_url[idx])
+    else:
+        for idx in range(3):
+            temp = os.path.join(temp, split_url[idx])
+
+    return temp
