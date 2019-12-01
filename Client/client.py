@@ -1,5 +1,6 @@
 import rpyc
 import os
+from hashlib import sha256
 
 class Client(rpyc.Service):
 
@@ -9,8 +10,8 @@ class Client(rpyc.Service):
         self.urls = []
 
         print('URLs iniciales (presione ENTER para terminar):')
-            
-        while(True):    
+
+        while(True):
             url = input()
             if url == '':
                 if len(self.urls) == 0:
@@ -18,17 +19,23 @@ class Client(rpyc.Service):
                     print()
                     print()
                     print('URLs iniciales (presione ENTER para terminar):')
-                    continue                
+                    continue
                 else:
                     break
-            
+
             self.urls.append(url)
 
         if not os.path.isdir('downloads'):
             os.mkdir('downloads')
 
     def connect(self, ip, port):
-        with rpyc.connect(ip, port) as cnn:
-            cnn.root.receive_urls(self.urls, self.ip, self.port)    
 
-        
+        for url in self.urls:
+            with rpyc.connect(ip, port) as cnn:
+                print(url)
+                hash_url = int(sha256(url.encode()).hexdigest(), 16)%2**(160)
+                print(hash_url)
+                _, ip_ask, port_ask = cnn.root.find_successor(hash_url)
+
+            with rpyc.connect(ip_ask, port_ask) as cnn:
+                cnn.root.download(url, self.ip, self.port)
