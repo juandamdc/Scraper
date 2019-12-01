@@ -4,10 +4,11 @@ from  rpyc.utils.server import ThreadedServer
 import threading
 import sys
 
-
-ch2= ChordNode('localhost',int(sys.argv[1]))
-t2= ThreadedServer(ch2,port=int(sys.argv[1]))
+ch2= ChordNode()
+ch2.start( sys.argv[1],int(sys.argv[2]))
+t2= ThreadedServer(ch2,port=int(sys.argv[2]))
 t2=threading.Thread(target=t2.start)
 t2.start()
-ch2.join('localhost',8000)
-ch2.fingerTable[0]
+ch2.join('10.42.0.1',8000)
+print(ch2.fingerTable[0].node)
+print(ch2.exposed_predecessor())
