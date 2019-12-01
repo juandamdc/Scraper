@@ -10,8 +10,10 @@ import time
 
 class ChordNode(rpyc.Service):
 
+class ChordNode(rpyc.Service):
+
     def start(self, ip, port):
-        self.size=256
+        self.size=160
         self.ip = ip
         self.port = port
         self.idx = int(hashlib.sha256(ip.encode() + str(port).encode()).hexdigest(), 16)%2**self.size
@@ -36,12 +38,17 @@ class ChordNode(rpyc.Service):
 
     def remote_node(self, node,time=60):
         try:
-            return rpyc.connect(node[1], node[2],config={'sync_request_timeout':time}).root.node()
+            a = rpyc.connect(node[1], node[2],config={'sync_request_timeout':time})
+            b = a.root.node()
+            a.close()
+            return b
         except:
             return None
 
     def ping(self,node):
-        rpyc.connect(node[1], node[2]).ping
+        a=rpyc.connect(node[1], node[2],config={'sync_request_timeout':0.1})
+        a.ping()
+        a.close()
         
 
     def exposed_successor(self):
@@ -54,28 +61,45 @@ class ChordNode(rpyc.Service):
         for i in range(self.size-1, 0, -1):
             if self.fingerTable[i].node is None:
                 continue
-            if Interval(self.idx + 1, idx - 1).contains(self.fingerTable[i].node[0]):
+            if Interval(self.idx + 1, idx).contains(self.fingerTable[i].node[0]):
                 try:
                     self.ping(self.fingerTable[i].node)
                     return self.fingerTable[i].node
                 except Exception as e:
                     self.fingerTable[i].node = None
-        return self.exposed_node()[0]
+        return self.exposed_successor
 
     def closest_preceding_finger(self,node,idx):
         try:
-            return rpyc.connect(node[1], node[2],config={'sync_request_timeout':30}).root.closest_preceding_finger(idx)
+            a =rpyc.connect(node[1], node[2],config={'sync_request_timeout':30})
+            b=a.root.closest_preceding_finger(idx)
+            a.close()
+            return b
         except:
             return None
 
     def exposed_find_predecessor(self, idx):
-        n = self.remote_node((self.idx, self.ip, self.port))
-        while not n is None and not Interval(n[0][0] + 1, n[1][0]).contains(idx):
-            n = self.remote_node(self.closest_preceding_finger(n[0],idx))
-        return n
+        try:
+            n = self.remote_node((self.idx, self.ip, self.port))
+            while not Interval(n[0][0] + 1, n[1][0]+1).contains(idx):
+                n = self.remote_node(self.closest_preceding_finger(n[0],idx))
+            return n
+        except:
+            return None
 
     def exposed_find_successor(self, idx):
-        return self.exposed_find_predecessor(idx)[1]
+        try:
+            return self.exposed_find_predecessor(idx)[1]
+        except:
+            return None
+    def find_successor(self,node,idx):
+         try:
+            a =rpyc.connect(node[1], node[2],config={'sync_request_timeout':30})
+            b=a.root.find_successor(idx)
+            a.close()
+            return b
+         except:
+            return None
 
     def find_successor(self,node,idx):
          try:
@@ -105,7 +129,7 @@ class ChordNode(rpyc.Service):
         try:
             x = x[2]
             self.ping(x)
-            if Interval(self.idx + 1, self.exposed_successor()[0] - 1).contains(x[0]):
+            if Interval(self.idx + 1, self.exposed_successor()[0] ).contains(x[0]):
                 self.fingerTable[0].node = x
         except:
             pass
@@ -121,27 +145,29 @@ class ChordNode(rpyc.Service):
         except Exception as e:
             self.predecessor = None
 
-        if self.predecessor is None or Interval(self.predecessor[0] + 1, self.idx - 1).contains(node[0]):
+        if self.predecessor is None or Interval(self.predecessor[0] + 1, self.idx ).contains(node[0]):
             self.predecessor = node
 
     
     def notify(self,node,noti):
          try:
-            return rpyc.connect(node[1], node[2],config={'sync_request_timeout':30}).root.notify(noti)
+            a = rpyc.connect(node[1], node[2],config={'sync_request_timeout':30})
+            b=a.root.notify(noti)
+            a.close()
+            return
          except:
             return 
 
     @repeater(10)
     def fix_fingers(self):
         self.iter=random.randint(0,self.size-1)
-        self.fingerTable[self.iter].node = self.exposed_find_successor(self.fingerTable[self.iter].start)
-       
+        self.fingerTable[self.iter].node = self.exposed_find_successor(self.fingerTable[self.iter].start)     
 
     def next_successor(self):
         for idx in range(self.size):
             if self.fingerTable[idx].node is None:
                     continue
-           ## print(self.fingerTable[idx].node,idx)
+           ## print(self.fingerTable[idx].node,idx))
             try:
                 self.ping(self.fingerTable[idx].node)
             except Exception as e:
