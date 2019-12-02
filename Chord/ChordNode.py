@@ -7,7 +7,17 @@ from Interval import Interval
 from Repeater import repeater
 from threading import Lock
 import time
+import sys
+import os
 
+new_dir = os.path.join(os.path.pardir, 'Scrapy')
+modules = {}
+
+sys.path.append(new_dir)
+for module in os.listdir(new_dir):
+    if '.py' in module and '.pyc' not in module:
+        current = module.replace('.py', '')
+        modules[current] = __import__(current)
 
 class ChordNode(rpyc.Service):
 
@@ -21,7 +31,7 @@ class ChordNode(rpyc.Service):
         self.predecessor = None
         self.iter = 1
         self.mut=Lock()
-        
+        self.to_scrapy = []
 
     def exposed_idx(self):
         return self.idx
@@ -48,7 +58,7 @@ class ChordNode(rpyc.Service):
         a=rpyc.connect(node[1], node[2],config={'sync_request_timeout':0.1})
         a.ping()
         a.close()
-        
+
 
     def exposed_successor(self):
         return self.fingerTable[0].node
@@ -100,18 +110,24 @@ class ChordNode(rpyc.Service):
          except:
             return None
 
+    def find_successor(self,node,idx):
+         try:
+            return rpyc.connect(node[1], node[2],config={'sync_request_timeout':30}).root.find_successor(idx)
+         except:
+            return None
+
     def join(self, ip, port):
         self.predecessor = None
         try:
             n = self.remote_node((0, ip, port))
             n = self.find_successor(n[0],self.idx)
-            self.fingerTable[0].node = n     
+            self.fingerTable[0].node = n
         except:
             self.fingerTable[0].node = (self.idx , self.ip , self.port)
             self.predecessor = (self.idx , self.ip , self.port)
 
         threading.Thread(target=self.stabilize).start()
-        threading.Thread(target=self.fix_fingers).start() 
+        threading.Thread(target=self.fix_fingers).start()
 
     @repeater(2)
     def stabilize(self):
@@ -128,8 +144,8 @@ class ChordNode(rpyc.Service):
             pass
         self.notify(self.exposed_successor(),(self.idx, self.ip, self.port))
         return
-      
-                
+
+
 
     def exposed_notify(self, node):
 
@@ -141,7 +157,7 @@ class ChordNode(rpyc.Service):
         if self.predecessor is None or Interval(self.predecessor[0] + 1, self.idx ).contains(node[0]):
             self.predecessor = node
 
-    
+
     def notify(self,node,noti):
          try:
             a = rpyc.connect(node[1], node[2],config={'sync_request_timeout':30})
@@ -149,12 +165,12 @@ class ChordNode(rpyc.Service):
             a.close()
             return
          except:
-            return 
+            return
 
     @repeater(10)
     def fix_fingers(self):
         self.iter=random.randint(0,self.size-1)
-        self.fingerTable[self.iter].node = self.exposed_find_successor(self.fingerTable[self.iter].start)     
+        self.fingerTable[self.iter].node = self.exposed_find_successor(self.fingerTable[self.iter].start)
 
     def next_successor(self):
         for idx in range(self.size):
@@ -174,3 +190,7 @@ class ChordNode(rpyc.Service):
 
     def exposed_ind(self, idx):
         return self.fingerTable[idx].start , self.fingerTable[idx].node
+
+    def exposed_download(self, url, ip, port):
+        print(self.port)
+        modules['scraper'].Hi(url).start_requests()
