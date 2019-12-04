@@ -22,7 +22,7 @@ for module in os.listdir(new_dir):
 class ChordNode(rpyc.Service):
 
     def start(self, ip, port):
-        self.size=160
+        self.size=10
         self.ip = ip
         self.port = port
         self.idx = int(hashlib.sha256(ip.encode() + str(port).encode()).hexdigest(), 16)%2**self.size
@@ -110,11 +110,6 @@ class ChordNode(rpyc.Service):
          except:
             return None
 
-    def find_successor(self,node,idx):
-         try:
-            return rpyc.connect(node[1], node[2],config={'sync_request_timeout':30}).root.find_successor(idx)
-         except:
-            return None
 
     def join(self, ip, port):
         self.predecessor = None
@@ -148,7 +143,7 @@ class ChordNode(rpyc.Service):
 
 
     def exposed_notify(self, node):
-
+        self.mut.acquire()
         try:
             self.ping(self.predecessor)
         except Exception as e:
@@ -156,7 +151,7 @@ class ChordNode(rpyc.Service):
 
         if self.predecessor is None or Interval(self.predecessor[0] + 1, self.idx ).contains(node[0]):
             self.predecessor = node
-
+        self.mut.release()
 
     def notify(self,node,noti):
          try:
@@ -169,7 +164,7 @@ class ChordNode(rpyc.Service):
 
     @repeater(10)
     def fix_fingers(self):
-        self.iter=random.randint(0,self.size-1)
+        self.iter=random.randint(1,self.size-1)
         self.fingerTable[self.iter].node = self.exposed_find_successor(self.fingerTable[self.iter].start)
 
     def next_successor(self):
