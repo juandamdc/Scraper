@@ -1,5 +1,5 @@
 import client
 
 cnn = client.Client()
-cnn.start('127.0.0.1', 8079)
-cnn.connect('127.0.0.1', 8000)
+cnn.start()
+cnn.connect('10.42.0.1', 8000)

@@ -8,7 +8,6 @@ import time
 class Scraper():
     def __init__(self, url):
         self.url = url
-        self.retry = []
 
     def start_requests(self):
         wait = 0
@@ -49,17 +48,17 @@ class Scraper():
                 links.append((urllib.parse.urljoin(base_url, soup_tag[indx]['src']), name))
                 soup_tag[indx]['src'] = name
 
-        filename = sha256(response.url.encode('utf-8')).hexdigest()
+        filename = sha256(self.url.encode('utf-8')).hexdigest()
+        dir = os.path.join('downloads', filename)
         page = 'index.html'
 
-        if not os.path.isdir(filename):
-            os.mkdir(filename)
+        if not os.path.isdir(dir):
+            os.makedirs(dir)
 
-        with open(os.path.join(filename, page), 'wb') as f:
+        with open(os.path.join(dir, page), 'wb') as f:
             f.write(soup.prettify(formatter='html').encode('utf-8'))
 
         yield filename, page, soup.prettify(formatter='html').encode('utf-8')
-
 
         for (tag_url, name_url) in links:
 
@@ -87,7 +86,7 @@ class Scraper():
                     time.sleep(2**wait)
                     wait = wait + 1
 
-            with open(os.path.join(filename, name_url), 'wb') as f:
+            with open(os.path.join(dir, name_url), 'wb') as f:
                 f.write(html)
 
             yield filename, name_url, html
