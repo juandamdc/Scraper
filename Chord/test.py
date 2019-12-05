@@ -5,7 +5,7 @@ import threading
 import sys
 
 ch= ChordNode()
-ch.start('127.0.0.1' ,8000)
+ch.start('10.42.0.1' ,8000)
 t= ThreadedServer(ch,port=8000)
 t=threading.Thread(target=t.start)
 t.start()
