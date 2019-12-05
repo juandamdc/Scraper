@@ -31,7 +31,7 @@ class ChordNode(rpyc.Service):
         self.predecessor = None
         self.iter = 1
         self.mut=Lock()
-        self.to_scrapy = []
+        self.downloads = {}
 
     def exposed_idx(self):
         return self.idx
@@ -186,7 +186,36 @@ class ChordNode(rpyc.Service):
         return self.fingerTable[idx].start , self.fingerTable[idx].node
 
     def exposed_download(self, url):
+        print(self.downloads)
+        if url in self.downloads.keys() and time.monotonic() - self.downloads[url] < 900:
+            for doc in self.download_memory(url):
+                yield doc
+        else:
+            for doc in self.download_scrapy(url):
+                yield doc
+
+            self.downloads[url] = time.monotonic()
+
+    def download_scrapy(self, url):
+        print()
+        print(f'INFO: get {url} from scrapy')
+
         scr = modules['scraper'].Scraper(url)
 
         for doc in scr.start_requests():
             yield doc
+
+    def download_memory(self, url):
+        print()
+        print(f'INFO: get {url} from memory')
+
+        hash_url = hashlib.sha256(url.encode()).hexdigest()
+        dir = os.path.join('downloads', hash_url)
+
+        for direct in os.listdir(dir):
+            dir_file = os.path.join(dir, direct)
+
+            with open(dir_file, 'rb') as f:
+                page = f.read()
+
+            yield hash_url, direct, page
