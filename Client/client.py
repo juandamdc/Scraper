@@ -25,17 +25,22 @@ class Client(rpyc.Service):
 
             self.urls.append(url)
 
-        if not os.path.isdir('downloads'):
-            os.mkdir('downloads')
-
     def connect(self, ip, port):
-
         for url in self.urls:
             with rpyc.connect(ip, port) as cnn:
-                print(url)
                 hash_url = int(sha256(url.encode()).hexdigest(), 16)%2**(160)
-                print(hash_url)
                 _, ip_ask, port_ask = cnn.root.find_successor(hash_url)
 
             with rpyc.connect(ip_ask, port_ask) as cnn:
-                cnn.root.download(url, self.ip, self.port)
+                try:
+                    for page_html in cnn.root.download(url):
+
+                        dir = os.path.join('downloads', page_html[0])
+                        if not os.path.isdir(dir):
+                            os.makedirs(dir)
+
+                        with open(os.path.join(dir,page_html[1]), 'wb') as f:
+                            f.write(page_html[2])
+
+                except Exception:
+                    pass

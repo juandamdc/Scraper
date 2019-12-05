@@ -182,11 +182,11 @@ class ChordNode(rpyc.Service):
             return
         self.fingerTable[0].node = (self.idx,self.ip,self.port)
 
-
-
     def exposed_ind(self, idx):
         return self.fingerTable[idx].start , self.fingerTable[idx].node
 
-    def exposed_download(self, url, ip, port):
-        print(self.port)
-        modules['scraper'].Hi(url).start_requests()
+    def exposed_download(self, url):
+        scr = modules['scraper'].Scraper(url)
+
+        for doc in scr.start_requests():
+            yield doc

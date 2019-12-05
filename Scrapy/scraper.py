@@ -3,73 +3,108 @@ import urllib
 from bs4 import BeautifulSoup
 from hashlib import sha256
 import os
+import time
 
-class Hi():
+class Scraper():
     def __init__(self, url):
         self.url = url
         self.retry = []
 
     def start_requests(self):
-        try:
-            with urllib.request.urlopen(self.url) as response:
-                html = response.read()
+        wait = 0
+        while True:
+            try:
+                print(f'INFO: GET {self.url}')
+                with urllib.request.urlopen(self.url) as response:
+                    html = response.read()
 
-            base_url = form_url(self.url)
-            print(base_url)
-            links = []
+                break
 
-            soup_tag = BeautifulSoup(html, 'lxml').find_all(extract_tags)
-            for indx in range(len(soup_tag)):
-                name = ''
+            except Exception:
+                print(f'ERROR: an error ocurred when try to get {self.url}')
 
-                if soup_tag[indx].has_attr('href'):
-                    name = put_name(soup_tag[indx]['href'])
-                    links.append((os.path.join(base_url, soup_tag[indx]['href']), name))
-                    soup_tag[indx]['href'] = name
+                if wait == 2:
+                    print(f'ERROR: download failed: {self.url}')
+                    return None
 
-                if soup_tag[indx].has_attr('src'):
-                    name = put_name(soup_tag[indx]['src'])
-                    links.append((os.path.join(base_url, soup_tag[indx]['src']), name))
-                    soup_tag[indx]['src'] = name
+                print(f'INFO: trying again in {2**wait} seconds')
+                time.sleep(2**wait)
+                wait = wait + 1
 
-            filename = sha256(response.url.encode('utf-8')).hexdigest()
-            page = 'index.html'
 
-            if not os.path.isdir(filename):
-                os.mkdir(filename)
+        base_url = form_url(self.url)
+        links = []
 
-            with open(os.path.join(filename, page), 'wb') as f:
-                f.write(html)
+        soup = BeautifulSoup(html, 'lxml')
+        soup_tag = soup.find_all(extract_tags)
 
-            for (tag_url, name_url) in links:
+        for indx in range(len(soup_tag)):
+            if soup_tag[indx].has_attr('href'):
+                name = put_name(soup_tag[indx]['href'])
+                links.append((urllib.parse.urljoin(base_url, soup_tag[indx]['href']), name))
+                soup_tag[indx]['href'] = name
+
+            if soup_tag[indx].has_attr('src'):
+                name = put_name(soup_tag[indx]['src'])
+                links.append((urllib.parse.urljoin(base_url, soup_tag[indx]['src']), name))
+                soup_tag[indx]['src'] = name
+
+        filename = sha256(response.url.encode('utf-8')).hexdigest()
+        page = 'index.html'
+
+        if not os.path.isdir(filename):
+            os.mkdir(filename)
+
+        with open(os.path.join(filename, page), 'wb') as f:
+            f.write(soup.prettify(formatter='html').encode('utf-8'))
+
+        yield filename, page, soup.prettify(formatter='html').encode('utf-8')
+
+
+        for (tag_url, name_url) in links:
+
+            scheme, netloc, path, query, fragment = urllib.parse.urlsplit(tag_url)
+            path = urllib.parse.quote(path)
+            link = urllib.parse.urlunsplit((scheme, netloc, path, query, fragment))
+
+            wait = 0
+            while True:
                 try:
-                    with urllib.request.urlopen(tag_url) as response:
+                    print(f'INFO: GET {link}')
+                    with urllib.request.urlopen(link) as response:
                         html = response.read()
 
-                    with open(os.path.join(filename, name_url), 'wb') as f:
-                        f.write(html)
-                except Exception as d:
-                    print(d)
+                    break
 
-        except Exception as e:
-            raise e
+                except Exception:
+                    print(f'ERROR: an error ocurred when try to get {link}')
+
+                    if wait == 2:
+                        print(f'ERROR: download failed: {link}')
+                        break
+
+                    print(f'INFO: trying again in {2**wait} seconds')
+                    time.sleep(2**wait)
+                    wait = wait + 1
+
+            with open(os.path.join(filename, name_url), 'wb') as f:
+                f.write(html)
+
+            yield filename, name_url, html
 
 def extract_tags(tag):
-    return (tag.has_attr('href') and (match(r'.*\.css$', tag['href']) or match(r'.*\.js$', tag['href']) or match(r'.*\.jpg$', tag['href']) or match(r'.*\.png$', tag['href']) or match(r'.*\.ico$', tag['href']))) or (tag.has_attr('src') and (match(r'.*\.css$', tag['src']) or match(r'.*\.js$', tag['src']) or match(r'.*\.jpg$', tag['src']) or match(r'.*\.png$', tag['src']) or match(r'.*\.ico$', tag['src'])))
+    return (tag.has_attr('href') and (match(r'.*\.php', tag['href']) or match(r'.*\.css', tag['href']) or match(r'.*\.js', tag['href']) or match(r'.*\.jpg', tag['href']) or match(r'.*\.png', tag['href']) or match(r'.*\.ico', tag['href']))) or (tag.has_attr('src') and (match(r'.*\.php', tag['src']) or match(r'.*\.css', tag['src']) or match(r'.*\.js', tag['src']) or match(r'.*\.jpg', tag['src']) or match(r'.*\.png', tag['src']) or match(r'.*\.ico', tag['src'])))
 
 def put_name(name):
-    return '.'.join(name.split('/'))
+    split_name = name.replace('?', '').replace('=', '').split('/')
+    split_name = split_name[max(0, len(split_name) - 4):]
+    return '-'.join(split_name)
 
 def form_url(url):
-    url = url.split('?')[0]
+    # url = url.split('?')[0]
     split_url = url.split('/')
 
-    temp = ''
     if split_url[0]=='file:':
-        for idx in range(len(split_url)- 1):
-            temp = os.path.join(temp, split_url[idx])
+        return '/'.join(split_url[0:-1])
     else:
-        for idx in range(3):
-            temp = os.path.join(temp, split_url[idx])
-
-    return temp
+        return '/'.join(split_url[0:3])
