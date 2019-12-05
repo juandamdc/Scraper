@@ -70,7 +70,7 @@ class ChordNode(rpyc.Service):
         for i in range(self.size-1, 0, -1):
             if self.fingerTable[i].node is None:
                 continue
-            if Interval(self.idx + 1, idx).contains(self.fingerTable[i].node[0]):
+            if Interval(self.idx + 1, idx-1).contains(self.fingerTable[i].node[0]):
                 try:
                     self.ping(self.fingerTable[i].node)
                     return self.fingerTable[i].node
@@ -90,7 +90,7 @@ class ChordNode(rpyc.Service):
     def exposed_find_predecessor(self, idx):
         try:
             n = self.remote_node((self.idx, self.ip, self.port))
-            while not Interval(n[0][0] + 1, n[1][0]+1).contains(idx):
+            while not Interval(n[0][0] + 1, n[1][0]).contains(idx):
                 n = self.remote_node(self.closest_preceding_finger(n[0],idx))
             return n
         except:
@@ -128,12 +128,13 @@ class ChordNode(rpyc.Service):
     def stabilize(self):
         x = self.remote_node(self.exposed_successor())
         if x is None:
+            print("fallo",self.exposed_successor())
             self.next_successor()
             return
         try:
             x = x[2]
             self.ping(x)
-            if Interval(self.idx + 1, self.exposed_successor()[0] ).contains(x[0]):
+            if Interval(self.idx + 1, self.exposed_successor()[0] -1).contains(x[0]):
                 self.fingerTable[0].node = x
         except:
             pass
@@ -149,7 +150,7 @@ class ChordNode(rpyc.Service):
         except Exception as e:
             self.predecessor = None
 
-        if self.predecessor is None or Interval(self.predecessor[0] + 1, self.idx ).contains(node[0]):
+        if self.predecessor is None or Interval(self.predecessor[0]+1 , self.idx-1).contains(node[0]):
             self.predecessor = node
         self.mut.release()
 
