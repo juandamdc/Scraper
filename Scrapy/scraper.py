@@ -24,7 +24,7 @@ class Scraper():
 
                 if wait == 2:
                     print(f'ERROR: download failed: {self.url}')
-                    return None
+                    return [(0,0,0)]
 
                 print(f'INFO: trying again in {2**wait} seconds')
                 time.sleep(2**wait)
