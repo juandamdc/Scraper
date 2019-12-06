@@ -47,18 +47,17 @@ class ChordNode(rpyc.Service):
 
     def remote_node(self, node,time=60):
         try:
-            a = rpyc.connect(node[1], node[2],config={'sync_request_timeout':time})
-            b = a.root.node()
-            a.close()
+            with rpyc.connect(node[1], node[2],config={'sync_request_timeout':time}) as a:
+                b = a.root.node()
+                a.close()
             return b
         except:
             return None
 
     def ping(self,node):
-        a=rpyc.connect(node[1], node[2],config={'sync_request_timeout':0.1})
-        a.ping()
-        a.close()
-
+        with rpyc.connect(node[1], node[2],config={'sync_request_timeout':0.1}) as a:
+            a.ping()
+            a.close()
 
     def exposed_successor(self):
         return self.fingerTable[0].node
@@ -76,13 +75,13 @@ class ChordNode(rpyc.Service):
                     return self.fingerTable[i].node
                 except Exception as e:
                     self.fingerTable[i].node = None
-        return self.exposed_successor
+        return self.exposed_successor()
 
     def closest_preceding_finger(self,node,idx):
         try:
-            a =rpyc.connect(node[1], node[2],config={'sync_request_timeout':30})
-            b=a.root.closest_preceding_finger(idx)
-            a.close()
+            with rpyc.connect(node[1], node[2],config={'sync_request_timeout':30}) as a:
+                b=a.root.closest_preceding_finger(idx)
+                a.close()
             return b
         except:
             return None
@@ -103,10 +102,10 @@ class ChordNode(rpyc.Service):
             return None
     def find_successor(self,node,idx):
          try:
-            a =rpyc.connect(node[1], node[2],config={'sync_request_timeout':30})
-            b=a.root.find_successor(idx)
-            a.close()
-            return b
+             with rpyc.connect(node[1], node[2],config={'sync_request_timeout':30}) as a:
+                 b=a.root.find_successor(idx)
+                 a.close()
+             return b
          except:
             return None
 
@@ -156,10 +155,10 @@ class ChordNode(rpyc.Service):
 
     def notify(self,node,noti):
          try:
-            a = rpyc.connect(node[1], node[2],config={'sync_request_timeout':30})
-            b=a.root.notify(noti)
-            a.close()
-            return
+             with rpyc.connect(node[1], node[2],config={'sync_request_timeout':30}) as a:
+                 b=a.root.notify(noti)
+                 a.close()
+             return
          except:
             return
 
@@ -186,15 +185,20 @@ class ChordNode(rpyc.Service):
         return self.fingerTable[idx].start , self.fingerTable[idx].node
 
     def exposed_download(self, url):
-        print(self.downloads)
         if url in self.downloads.keys() and time.monotonic() - self.downloads[url] < 900:
             for doc in self.download_memory(url):
                 yield doc
         else:
+            save = False
             for doc in self.download_scrapy(url):
                 yield doc
 
-            self.downloads[url] = time.monotonic()
+                if doc!=(0,0,0):
+                    save = True
+
+            if save:
+                self.downloads[url] = time.monotonic()
+
 
     def download_scrapy(self, url):
         print()
