@@ -33,7 +33,7 @@ class Client(rpyc.Service):
 
 def start_download(url, ip, port):
     with rpyc.connect(ip, port) as cnn:
-        hash_url = int(sha256(url.encode()).hexdigest(), 16)%2**(10)
+        hash_url = int(sha256(url.encode()).hexdigest(), 16)%2**(160)
 
         wait = 0
         while wait != 3:

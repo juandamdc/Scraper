@@ -22,7 +22,7 @@ for module in os.listdir(new_dir):
 class ChordNode(rpyc.Service):
 
     def start(self, ip, port):
-        self.size=10
+        self.size=160
         self.ip = ip
         self.port = port
         self.idx = int(hashlib.sha256(ip.encode() + str(port).encode()).hexdigest(), 16)%2**self.size

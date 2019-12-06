@@ -61,9 +61,8 @@ class Scraper():
         yield filename, page, soup.prettify(formatter='html').encode('utf-8')
 
         for (tag_url, name_url) in links:
-
             scheme, netloc, path, query, fragment = urllib.parse.urlsplit(tag_url)
-            path = urllib.parse.quote(path)
+            path = urllib.parse.unquote(path)
             link = urllib.parse.urlunsplit((scheme, netloc, path, query, fragment))
 
             wait = 0
@@ -104,6 +103,6 @@ def form_url(url):
     split_url = url.split('/')
 
     if split_url[0]=='file:':
-        return '/'.join(split_url[0:-1])
+        return '/'.join(split_url[0:])
     else:
         return '/'.join(split_url[0:3])
