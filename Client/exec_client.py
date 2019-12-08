@@ -1,5 +1,6 @@
+import sys
 import client
 
 cnn = client.Client()
 cnn.start()
-cnn.connect('127.0.0.1', 8090)
+cnn.connect(sys.argv[1], int(sys.argv[2]))
